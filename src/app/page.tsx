@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ChatbotInterface } from '@/components/ChatbotInterface';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import type { Personality } from '@/ai/flows/schemas';
 
 
 if (typeof window !== 'undefined') {
@@ -31,6 +32,14 @@ const defaultPalette = [
     { name: 'Verde', value: '142 71% 45%' },
     { name: 'Rosa', value: '340 82% 52%' },
     { name: 'Morado', value: '262 84% 58%' },
+];
+
+const personalityOptions: { value: Personality; label: string; description: string }[] = [
+  { value: 'profesional', label: 'Profesional', description: 'Claro, cortés y directo.' },
+  { value: 'entusiasta', label: 'Entusiasta', description: 'Cálido y positivo.' },
+  { value: 'divertido', label: 'Divertido', description: 'Cercano, con humor ligero.' },
+  { value: 'formal', label: 'Formal', description: 'Protocolar y serio.' },
+  { value: 'ventas', label: 'Experto en Ventas', description: 'Persuasivo, orientado a cerrar.' },
 ];
 
 export default function Home() {
@@ -47,6 +56,7 @@ export default function Home() {
   const [feedbackKnowledge, setFeedbackKnowledge] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [colorPalette, setColorPalette] = useState(defaultPalette);
+  const [personality, setPersonality] = useState<Personality>('profesional');
   const [isExtractingColors, setIsExtractingColors] = useState(false);
   const [completedBots, setCompletedBots] = useState(0);
 
@@ -83,7 +93,7 @@ export default function Home() {
         });
       } else if (file.type === 'application/pdf') {
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        const pdf = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer)}).promise;
         const numPages = pdf.numPages;
         let fullText = '';
         for (let i = 1; i <= numPages; i++) {
@@ -451,12 +461,33 @@ export default function Home() {
                                     )}
                                 </div>
                             </div>
+                            <div className="space-y-2">
+                                <label className="font-medium">Personalidad del Asistente</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {personalityOptions.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            title={opt.description}
+                                            onClick={() => setPersonality(opt.value)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full text-sm border transition-colors",
+                                                personality === opt.value
+                                                    ? "bg-primary text-primary-foreground border-primary"
+                                                    : "bg-transparent border-muted-foreground/30 hover:border-primary"
+                                            )}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                      <div className="flex flex-col items-center justify-center bg-muted/30 p-4 rounded-lg">
                         <CardTitle className="mb-4">Previsualización</CardTitle>
                         <div className="w-full max-w-sm">
-                           <ChatbotInterface key={`${chatbotInterfaceId}-${primaryColor}`} businessName={businessName} knowledgeBase={fullKnowledgeBase} isPreview={true} logoUrl={logoUrl}/>
+                           <ChatbotInterface key={`${chatbotInterfaceId}-${primaryColor}`} businessName={businessName} knowledgeBase={fullKnowledgeBase} isPreview={true} logoUrl={logoUrl} personality={personality}/>
                         </div>
                      </div>
                 </div>
@@ -470,7 +501,7 @@ export default function Home() {
                                 <CardDescription>Conversa con tu IA para asegurarte de que responde como esperas.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChatbotInterface key={`${chatbotInterfaceId}-test`} businessName={businessName} knowledgeBase={fullKnowledgeBase} logoUrl={logoUrl}/>
+                                <ChatbotInterface key={`${chatbotInterfaceId}-test`} businessName={businessName} knowledgeBase={fullKnowledgeBase} logoUrl={logoUrl} personality={personality}/>
                             </CardContent>
                         </Card>
                     </div>
