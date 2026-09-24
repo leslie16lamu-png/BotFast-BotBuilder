@@ -1,6 +1,6 @@
 # Observaciones de trabajo — BotFast-BotBuilder
 
-## 2026-09-24 — Tarea 1: Generalización del chatbot + limpieza de dependencias
+## 2026-09-23 — Tarea 1: Generalización del chatbot + limpieza de dependencias
 - **Qué se hizo:**
   - `schemas.ts` y `chatbotFlow.ts` reescritos: el chatbot ahora es genérico para cualquier negocio, tiene 5 personalidades (`profesional`, `entusiasta`, `divertido`, `formal`, `ventas`) y devuelve `shouldEscalate` cuando detecta intención de compra/reserva. Se quitaron las tools de reservación de eventos.
   - Se eliminaron `src/ai/tools/eventBookingTools.ts`, `src/services/eventService.ts`, `src/types/index.ts` y `src/components/OpportunityCard.tsx`.
