@@ -1,94 +1,68 @@
 'use server';
 /**
- * @fileOverview Asistente de IA dinámico para negocios.
- *
- * - aiChatbot - Función principal para interactuar con el chatbot.
- * - AiChatbotInput - Tipo de entrada para el chatbot.
- * - AiChatbotOutput - Tipo de salida del chatbot.
+ * @fileOverview Asistente de IA genérico para cualquier tipo de negocio, con
+ * personalidad configurable y detección de intención de compra/reserva para
+ * escalar la conversación al dueño del negocio.
  */
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { 
-  checkDateAvailabilityTool, 
-  initiateBookingTool, 
-  getBeveragePackagesTool 
-} from '@/ai/tools/eventBookingTools';
-import { AiChatbotInputSchema, AiChatbotOutputSchema, type AiChatbotInput, type AiChatbotOutput } from './schemas';
+import { ai } from '@/ai/genkit';
+import {
+  AiChatbotInputSchema,
+  AiChatbotOutputSchema,
+  AiChatbotPromptInputSchema,
+  type AiChatbotInput,
+  type AiChatbotOutput,
+} from './schemas';
 
 export async function aiChatbot(input: AiChatbotInput): Promise<AiChatbotOutput> {
   return aiChatbotFlow(input);
 }
 
-// 1. CONEXIÓN CON LAS HERRAMIENTAS:
-// Se define el conjunto de herramientas que el chatbot puede utilizar para realizar acciones.
-const tools = [checkDateAvailabilityTool, initiateBookingTool, getBeveragePackagesTool];
+const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
+  profesional:
+    'Tono profesional, claro y cortés. Directo al grano, sin informalidades.',
+  entusiasta:
+    'Tono cálido, positivo y enérgico. Usa exclamaciones con moderación para transmitir entusiasmo genuino.',
+  divertido:
+    'Tono relajado, cercano y con un toque de humor ligero, sin perder el respeto ni la utilidad de la respuesta.',
+  formal:
+    'Tono formal y protocolar. Evita contracciones informales.',
+  ventas:
+    'Tono persuasivo y orientado a cerrar la venta: destaca beneficios, genera urgencia legítima (ej. disponibilidad limitada) y siempre invita a dar el siguiente paso. Nunca inventes datos ni presiones con información falsa.',
+};
 
 const aiChatbotPrompt = ai.definePrompt({
   name: 'aiDynamicAssistantPrompt',
-  input: {schema: AiChatbotInputSchema},
-  output: {schema: AiChatbotOutputSchema},
-  tools: tools, // Se enlazan las herramientas con el prompt.
-  prompt: `Eres un asistente virtual amigable y profesional para "{{businessName}}". Tu objetivo es ayudar a los clientes a conocer los servicios, verificar disponibilidad y realizar una pre-reserva de manera estructurada y eficiente, basándote en la "Base de Conocimiento".
+  input: { schema: AiChatbotPromptInputSchema },
+  output: { schema: AiChatbotOutputSchema },
+  prompt: `Eres el asistente virtual de "{{businessName}}". Respondes preguntas de clientes usando EXCLUSIVAMENTE la información de la "Base de Conocimiento" de abajo. Si no sabes algo porque no está en la base de conocimiento, dilo honestamente y sugiere que el cliente contacte directamente al negocio.
 
-  **Base de Conocimiento (Acerca de {{businessName}}):**
-  ---
-  {{{knowledge}}}
-  ---
+**Estilo de personalidad a seguir:** {{personalityInstruction}}
 
-  **Memoria Conversacional (MUY IMPORTANTE):**
-  *   Utiliza SIEMPRE el "Historial de conversación" para recordar información clave proporcionada por el usuario en mensajes anteriores.
-  *   NO vuelvas a preguntar por información que ya se encuentre en el historial.
+**Base de Conocimiento (Acerca de {{businessName}}):**
+---
+{{{knowledge}}}
+---
 
-  **2. EL FLUJO LÓGICO GUIADO (Sigue estos PASOS rigurosamente):**
+**Memoria Conversacional:**
+* Usa SIEMPRE el "Historial de conversación" para recordar lo que el usuario ya dijo. No repitas preguntas ya respondidas.
 
-  **PASO 1: Informar sobre Paquetes y Servicios**
-  *   Si el usuario pregunta por los paquetes o servicios, utiliza la herramienta 'getBeveragePackages' para obtener la información. Describe claramente lo que incluye cada paquete.
+**Tu función como filtro de clientes (MUY IMPORTANTE):**
+* Responde con normalidad preguntas sobre productos, servicios, precios, horarios o cualquier duda general usando la Base de Conocimiento.
+* Si detectas que el cliente muestra una intención clara de COMPRAR, RESERVAR, AGENDAR O APARTAR algo, marca "shouldEscalate" como verdadero y, en tu mensaje, dirígelo amablemente a contactar directamente al negocio usando los datos de contacto de la Base de Conocimiento (teléfono, WhatsApp o correo). No inventes procesos de pago ni de reserva que no estén descritos en la Base de Conocimiento.
+* Si es solo una pregunta informativa sin intención de cerrar, deja "shouldEscalate" como falso.
 
-  **PASO 2: Verificar Disponibilidad de Fechas**
-  *   Si el usuario indica interés en reservar, pregunta por la fecha del evento.
-  *   Asume el año 2025 si no se especifica.
-  *   DEBES convertir la fecha al formato \`AAAA-MM-DD\` ANTES de usar la herramienta 'checkDateAvailability'.
-  *   Si la fecha no está disponible, informa al usuario y pregunta si desea verificar otra.
-  *   Si la fecha está disponible, procede al PASO 3.
+Historial de conversación (mensajes anteriores):
+{{#if chatHistory}}
+{{#each chatHistory}}
+{{role}}: {{text}}
+{{/each}}
+{{else}}
+(No hay mensajes anteriores en esta conversación)
+{{/if}}
 
-  **PASO 3: Recopilar Detalles de la Reserva**
-  *   Una vez confirmada la fecha, pregunta secuencialmente por la siguiente información (una por una, solo si no está en el historial):
-      1. Paquete deseado
-      2. Número de invitados
-      3. Nombre completo del cliente
-      4. Correo electrónico
-      5. Número de teléfono
-      6. Tipo de evento
-
-  **PASO 4: Confirmación Final y Pre-Reserva**
-  *   Cuando tengas toda la información, resume todos los detalles al usuario para su confirmación final.
-  *   Tras la confirmación explícita del usuario, utiliza la herramienta 'initiateBooking'.
-
-  **PASO 5: Comunicar Detalles de la Pre-Reserva**
-  *   Comunica claramente la información devuelta por 'initiateBooking': ID de reserva, costo total, y monto del anticipo.
-
-  **Manejo de Preguntas Generales:**
-  *   Responde preguntas generales usando la "Base de Conocimiento" y luego regresa suavemente al flujo de reserva.
-  *   Si no tienes la información, indícalo honestamente.
-
-  **Instrucciones Importantes:**
-  *   Sé siempre cortés y profesional.
-  *   Pide clarificaciones si no entiendes algo.
-  *   No proceses pagos.
-  *   Usa EXCLUSIVAMENTE las herramientas proporcionadas cuando sea adecuado.
-
-  Historial de conversación (mensajes anteriores):
-  {{#if chatHistory}}
-  {{#each chatHistory}}
-  {{role}}: {{text}}
-  {{/each}}
-  {{else}}
-  (No hay mensajes anteriores en esta conversación)
-  {{/if}}
-
-  Mensaje actual del usuario (ID: {{{userId}}}):
-  {{{currentMessageText}}}
-  `,
+Mensaje actual del usuario (ID: {{{userId}}}):
+{{{currentMessageText}}}
+`,
 });
 
 const aiChatbotFlow = ai.defineFlow(
@@ -97,21 +71,34 @@ const aiChatbotFlow = ai.defineFlow(
     inputSchema: AiChatbotInputSchema,
     outputSchema: AiChatbotOutputSchema,
   },
-  async (input): Promise<AiChatbotOutput> => { 
+  async (input): Promise<AiChatbotOutput> => {
     try {
-      const { output } = await aiChatbotPrompt(input); 
-      
+      const personality = input.personality ?? 'profesional';
+      const personalityInstruction =
+        PERSONALITY_INSTRUCTIONS[personality] ?? PERSONALITY_INSTRUCTIONS.profesional;
+
+      const { output } = await aiChatbotPrompt({
+        ...input,
+        personalityInstruction,
+      });
+
       if (output && typeof output.response === 'string') {
         return output;
       }
-      
+
       if (output) {
         console.warn('AI chatbot output was not in the expected format:', output);
       }
-      return { response: "Lo siento, tuve un problema al procesar tu solicitud. Por favor, intenta de nuevo." };
+      return {
+        response:
+          'Lo siento, tuve un problema al procesar tu solicitud. Por favor, intenta de nuevo.',
+      };
     } catch (error) {
       console.error('Error in aiChatbotFlow:', error);
-      return { response: "Lo siento, encontré un error interno. Por favor, inténtalo de nuevo más tarde." };
+      return {
+        response:
+          'Lo siento, encontré un error interno. Por favor, inténtalo de nuevo más tarde.',
+      };
     }
   }
 );
