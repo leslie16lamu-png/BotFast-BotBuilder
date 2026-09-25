@@ -33,7 +33,7 @@ Nunca subas `.env` al repositorio (está en `.gitignore`).
 | `META_VERIFY_TOKEN` | Texto que tú eliges; debe ser igual al que pongas en Meta al registrar el webhook |
 | `META_VERSION` | Versión de Graph API (ej. `v21.0`; si se deja vacío se usa `v21.0`) |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Correo de la cuenta de servicio de Google Cloud |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Llave privada de la cuenta de servicio (los `\n` escapados se convierten solos) |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Llave privada de la cuenta de servicio (los `\\n` escapados se convierten solos) |
 | `GEMINI_API_KEY` | API key de Google AI Studio |
 | `BUSINESS_NAME` | (opcional) Nombre del negocio |
 | `BUSINESS_SHEET_ID` | (opcional) ID del Google Sheet del negocio (el tramo de la URL entre `/d/` y `/edit`) |
@@ -63,5 +63,14 @@ Para comprobar la verificación del webhook:
 curl "http://localhost:3008/webhook?hub.mode=subscribe&hub.verify_token=TU_TOKEN&hub.challenge=123"
 # debe responder: 123
 ```
+
+## Despliegue
+
+Este servicio necesita un **proceso persistente** porque mantiene un servidor HTTP siempre activo para el webhook de Meta y guarda estado en memoria (caché del Sheet, historial de conversación por usuario).
+
+- **Recomendado:** Railway, Render, Fly.io, o cualquier VPS con Docker. Usa el `Dockerfile` incluido (dos etapas: build con `npm ci` + `tsc`, y runner con `npm ci --omit=dev` + `node dist/app.js`). Configura las variables de entorno en la plataforma y expone el puerto `PORT`.
+- **No recomendado:** Vercel o Netlify en modo serverless / functions. Ese modelo corta el proceso entre peticiones y rompe el proveedor de BuilderBot y la caché en memoria.
+
+El wizard de la raíz (Next.js) sí puede seguir desplegado en Vercel/Netlify sin problema, porque es una app web estática/serverless independiente de este runtime.
 
 > ⚠️ No conectes el número real de WhatsApp ni despliegues a producción sin la aprobación del dueño del proyecto.
