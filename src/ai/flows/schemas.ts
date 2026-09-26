@@ -10,8 +10,7 @@ export const ChatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
-// Personalidades disponibles para el tono del chatbot. Son genéricas y
-// aplican a cualquier tipo de negocio (no dependen de un giro en particular).
+// Personalidades disponibles para el tono del chatbot.
 export const PersonalitySchema = z.enum([
   'profesional',
   'entusiasta',
@@ -20,6 +19,29 @@ export const PersonalitySchema = z.enum([
   'ventas',
 ]);
 export type Personality = z.infer<typeof PersonalitySchema>;
+
+// Idioma en el que debe responder el chatbot. Se puede ampliar con más
+// códigos más adelante sin romper lo existente.
+export const LanguageSchema = z.enum(['es', 'en']);
+export type Language = z.infer<typeof LanguageSchema>;
+
+// Tipo de acción de cierre detectada. "ninguna" = no hubo intención de cierre.
+export const ActionTypeSchema = z.enum([
+  'reservar',
+  'comprar',
+  'agendar',
+  'cotizar',
+  'ninguna',
+]);
+export type ActionType = z.infer<typeof ActionTypeSchema>;
+
+export const SocialLinksSchema = z.object({
+  facebook: z.string().optional(),
+  instagram: z.string().optional(),
+  tiktok: z.string().optional(),
+  website: z.string().optional(),
+});
+export type SocialLinks = z.infer<typeof SocialLinksSchema>;
 
 export const AiChatbotInputSchema = z.object({
   userId: z.string().describe('El ID del usuario.'),
@@ -35,15 +57,19 @@ export const AiChatbotInputSchema = z.object({
   personality: PersonalitySchema
     .optional()
     .describe('El tono/personalidad con la que debe responder el chatbot.'),
+  language: LanguageSchema
+    .optional()
+    .describe('El idioma en el que debe responder el chatbot.'),
 });
 export type AiChatbotInput = z.infer<typeof AiChatbotInputSchema>;
 
-// Esquema interno usado solo por el prompt: extiende el input público con
-// la instrucción de tono ya resuelta a partir de "personality".
 export const AiChatbotPromptInputSchema = AiChatbotInputSchema.extend({
   personalityInstruction: z
     .string()
     .describe('Instrucción de tono ya resuelta a partir de personality.'),
+  languageInstruction: z
+    .string()
+    .describe('Instrucción de idioma ya resuelta a partir de language.'),
 });
 export type AiChatbotPromptInput = z.infer<typeof AiChatbotPromptInputSchema>;
 
@@ -53,7 +79,16 @@ export const AiChatbotOutputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      'Verdadero si el cliente mostró intención de comprar, reservar o agendar y debe ser dirigido al dueño del negocio.'
+      'Verdadero si el cliente mostró intención de comprar, reservar, agendar o cotizar y debe ser dirigido al dueño del negocio.'
+    ),
+  actionType: ActionTypeSchema
+    .optional()
+    .describe('El tipo de acción de cierre detectada, solo si shouldEscalate es verdadero.'),
+  closingSummary: z
+    .string()
+    .optional()
+    .describe(
+      'Resumen breve, en primera persona y desde el punto de vista del cliente, de lo que quiere hacer. Se usa para prellenar un mensaje de WhatsApp. Solo se llena si shouldEscalate es verdadero. Ejemplo: "Quiero reservar mesa para 4 personas el sábado a las 8pm."'
     ),
 });
 export type AiChatbotOutput = z.infer<typeof AiChatbotOutputSchema>;

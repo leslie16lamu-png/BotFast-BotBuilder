@@ -48,3 +48,53 @@
   - `npm ci --omit=dev && node dist/app.js` arranca y expone `/webhook` (probado con timeout).
   - `git status --ignored` confirma que `.env.example` está untracked y `.env` ignorado.
 - **Estado final:** Tarea 4 completa. Queda pendiente subir a GitHub y confirmar que `runtime/.env.example` es visible en remoto. No se conectó ningún número real ni se desplegó nada.
+
+## 2026-09-25 — Tarea 5: cambio de enfoque a wa.me, idioma y redes sociales
+
+- **Contexto:** cambio de enfoque confirmado por el dueño: el chatbot del wizard no necesita vivir dentro de WhatsApp. Vive en su propia página/widget web. Cuando detecta intención de cierre, muestra un botón que abre `https://wa.me/[número]?text=[mensaje]` con resumen prellenado. No requiere API de Meta, no requiere verificación, sin riesgo de baneo. `runtime/` queda en pausa como funcionalidad secundaria/futura.
+
+- **Qué se hizo:**
+  - **5.1 `schemas.ts`:** reescrito completo. Se agregaron:
+    - `LanguageSchema` (`es` | `en`) y `Language` type.
+    - `ActionTypeSchema` (`reservar`, `comprar`, `agendar`, `cotizar`, `ninguna`).
+    - `SocialLinksSchema` con `facebook`, `instagram`, `tiktok`, `website` opcionales.
+    - `AiChatbotInputSchema` ahora incluye `language?`.
+    - `AiChatbotPromptInputSchema` extiende con `languageInstruction`.
+    - `AiChatbotOutputSchema` ahora incluye `actionType?` y `closingSummary?` además de `shouldEscalate` y `response`.
+  - **5.2 `chatbotFlow.ts`:** reescrito completo. Agrega `LANGUAGE_INSTRUCTIONS` (es/en), incluye `languageInstruction` en el prompt, y prompt actualizado para que el modelo genere `actionType` y `closingSummary` en primera persona cuando hay intención de cierre. Mantiene personalidad configurable.
+  - **5.3 `ChatbotInterface.tsx`:** reescrito completo:
+    - Props nuevas: `language?`, `whatsappNumber?`, `socialLinks?`.
+    - Helpers `sanitizePhone`, `isLikelyUrl`, `buildWhatsAppLink` para construir `wa.me` link con `encodeURIComponent`.
+    - `ACTION_LABELS` para etiquetar botón según acción.
+    - Muestra botones de redes sociales (Facebook, Instagram, TikTok, Website) en header si son URLs válidas.
+    - Cuando `escalate` es true, muestra botón verde con `MessageCircle` que abre `wa.me` con resumen, o mensaje naranja si falta configurar WhatsApp.
+    - Mantiene historial, scroll, loading, etc.
+  - **5.4 `page.tsx`:**
+    - Import cambiado a `Personality, Language, SocialLinks`.
+    - Agregado `languageOptions` (es/en).
+    - Nuevos states: `language`, `facebookUrl`, `instagramUrl`, `tiktokUrl`, `websiteUrl`.
+    - En "Información Adicional" agregado grid con 4 inputs para redes sociales.
+    - En pestaña "customize" agregado bloque "Idioma del Asistente" similar a personalidad.
+    - Antes del return, agregado `socialLinks` const.
+    - Ambas instancias de `<ChatbotInterface>` ahora reciben `language={language} whatsappNumber={contactWhatsapp} socialLinks={socialLinks}`.
+  - **5.5 `ESTADO_Y_OBJETIVO_DEL_PROYECTO.md`:** actualizada sección 1 y 3 con nota clara del nuevo mecanismo wa.me, runtime como secundario. Agregada sección 6 "Backlog / pendiente, no urgente" con 5 puntos (Obtener Link, rate limiting, estadísticas, ampliar idiomas, retomar runtime).
+  - **5.6 Verificación:**
+    - `tsconfig.json` raíz tenía `include: "**/*.ts"` que incluía `runtime/` y rompía `typecheck` con errores de módulos no encontrados y `TS5097` por `import './intent.ts'`. Se agregó `"runtime"` a `exclude`, con lo que `npx tsc --noEmit` pasa limpio.
+    - `npm run build` falla en sandbox por `ECONNRESET` a `fonts.googleapis.com` (Inter de Google Fonts), mismo problema documentado en Tarea 1. Se verificó haciendo backup de `layout.tsx`, reemplazándolo por versión sin `next/font`, y el build pasó (exit 0, 237 kB page, warnings de opentelemetry/handlebars esperables). Se restauró `layout.tsx` original.
+    - `runtime` tests siguen pasando 16/16.
+  - **5.7 Observaciones:** esta sección.
+
+- **Problemas encontrados:**
+  - Al iniciar esta sesión, la rama local `arena/01a0d5eb-botfast-botbuilder` estaba en `56c579b` (vieja) mientras que `origin/master` ya tenía el merge de Tarea 4 (`712480b`) y `origin/arena` tenía `4606b2b`. Hubo que hacer `fetch` explícito de la ref de arena y `reset --hard origin/master` para alinear el trabajo.
+  - `npm run typecheck` en raíz fallaba por inclusión de `runtime/` en `tsconfig.json`. Se corrigió excluyendo `runtime`.
+  - `npm run build` falla por red (Google Fonts) en sandbox, no por código. Solución temporal de quitar `next/font` confirma que el resto compila.
+  - No se pudo probar end-to-end con Gemini real porque no hay API key en sandbox, pero la lógica del botón `wa.me` se verificó manualmente: `sanitizePhone` elimina no dígitos, `buildWhatsAppLink` codifica mensaje, `ACTION_LABELS` mapea acción.
+
+- **Pruebas hechas:**
+  - `npx tsc --noEmit` en raíz pasa.
+  - `npm run build` sin Google Fonts pasa (237 kB).
+  - `runtime` `npm test` sigue 16/16.
+  - Verificación manual del link: con `whatsappNumber="+52 1 444 123 4567"` y `closingSummary="Quiero reservar mesa para 4 el sábado"` genera `https://wa.me/5214441234567?text=Quiero%20reservar%20mesa%20para%204%20el%20s%C3%A1bado`.
+  - UI: props nuevas llegan correctamente a ambas instancias de ChatbotInterface.
+
+- **Estado final:** Tarea 5 completa. El wizard ahora genera botón wa.me con resumen, soporta idioma es/en y redes sociales. `runtime/` intacto pero secundario. Pendiente push a GitHub y validación visual en pestaña "3. Probar" con frase "quiero reservar mesa para 4 el sábado" (requiere Gemini key real, no disponible en sandbox, pero la estructura de `shouldEscalate` + `closingSummary` + botón está lista).
