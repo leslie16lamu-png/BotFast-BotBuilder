@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ChatbotInterface } from '@/components/ChatbotInterface';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import type { Personality } from '@/ai/flows/schemas';
+import type { Personality, Language, SocialLinks } from '@/ai/flows/schemas';
 
 
 if (typeof window !== 'undefined') {
@@ -42,6 +42,11 @@ const personalityOptions: { value: Personality; label: string; description: stri
   { value: 'ventas', label: 'Experto en Ventas', description: 'Persuasivo, orientado a cerrar.' },
 ];
 
+const languageOptions: { value: Language; label: string }[] = [
+  { value: 'es', label: 'Español' },
+  { value: 'en', label: 'English' },
+];
+
 export default function Home() {
   const [knowledge, setKnowledge] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -57,6 +62,11 @@ export default function Home() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [colorPalette, setColorPalette] = useState(defaultPalette);
   const [personality, setPersonality] = useState<Personality>('profesional');
+  const [language, setLanguage] = useState<Language>('es');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [tiktokUrl, setTiktokUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [isExtractingColors, setIsExtractingColors] = useState(false);
   const [completedBots, setCompletedBots] = useState(0);
 
@@ -277,6 +287,13 @@ export default function Home() {
     WhatsApp: ${contactWhatsapp || 'No proporcionado'}
     Email de Contacto: ${contactEmail || 'No proporcionado'}
   `;
+
+  const socialLinks: SocialLinks = {
+    facebook: facebookUrl || undefined,
+    instagram: instagramUrl || undefined,
+    tiktok: tiktokUrl || undefined,
+    website: websiteUrl || undefined,
+  };
   
   const applyColorTheme = (color: string) => {
     setPrimaryColor(color);
@@ -378,6 +395,12 @@ export default function Home() {
                                         <Input placeholder="Teléfono de contacto" value={contactPhone} onChange={e => setContactPhone(e.target.value)}/>
                                         <Input placeholder="WhatsApp" value={contactWhatsapp} onChange={e => setContactWhatsapp(e.target.value)}/>
                                         <Input placeholder="Email de contacto" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)}/>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                                        <Input placeholder="Link de Facebook (opcional)" value={facebookUrl} onChange={e => setFacebookUrl(e.target.value)}/>
+                                        <Input placeholder="Link de Instagram (opcional)" value={instagramUrl} onChange={e => setInstagramUrl(e.target.value)}/>
+                                        <Input placeholder="Link de TikTok (opcional)" value={tiktokUrl} onChange={e => setTiktokUrl(e.target.value)}/>
+                                        <Input placeholder="Sitio web (opcional)" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)}/>
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
@@ -482,12 +505,32 @@ export default function Home() {
                                     ))}
                                 </div>
                             </div>
+                            <div className="space-y-2">
+                                <label className="font-medium">Idioma del Asistente</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {languageOptions.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setLanguage(opt.value)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full text-sm border transition-colors",
+                                                language === opt.value
+                                                    ? "bg-primary text-primary-foreground border-primary"
+                                                    : "bg-transparent border-muted-foreground/30 hover:border-primary"
+                                            )}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                      <div className="flex flex-col items-center justify-center bg-muted/30 p-4 rounded-lg">
                         <CardTitle className="mb-4">Previsualización</CardTitle>
                         <div className="w-full max-w-sm">
-                           <ChatbotInterface key={`${chatbotInterfaceId}-${primaryColor}`} businessName={businessName} knowledgeBase={fullKnowledgeBase} isPreview={true} logoUrl={logoUrl} personality={personality}/>
+                           <ChatbotInterface key={`${chatbotInterfaceId}-${primaryColor}`} businessName={businessName} knowledgeBase={fullKnowledgeBase} isPreview={true} logoUrl={logoUrl} personality={personality} language={language} whatsappNumber={contactWhatsapp} socialLinks={socialLinks}/>
                         </div>
                      </div>
                 </div>
@@ -501,7 +544,7 @@ export default function Home() {
                                 <CardDescription>Conversa con tu IA para asegurarte de que responde como esperas.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChatbotInterface key={`${chatbotInterfaceId}-test`} businessName={businessName} knowledgeBase={fullKnowledgeBase} logoUrl={logoUrl} personality={personality}/>
+                                <ChatbotInterface key={`${chatbotInterfaceId}-test`} businessName={businessName} knowledgeBase={fullKnowledgeBase} logoUrl={logoUrl} personality={personality} language={language} whatsappNumber={contactWhatsapp} socialLinks={socialLinks}/>
                             </CardContent>
                         </Card>
                     </div>
